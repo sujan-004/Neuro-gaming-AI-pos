@@ -1,75 +1,46 @@
 from flask import Flask, render_template, request, jsonify
 from flask_cors import CORS
 import cv2
-import mediapipe as mp
 import numpy as np
 import base64
 import io
 from PIL import Image
 import json
 import random
+import os
 
 app = Flask(__name__)
 CORS(app)
 
-# Initialize MediaPipe
-mp_face_mesh = mp.solutions.face_mesh
-mp_drawing = mp.solutions.drawing_utils
-face_mesh = mp_face_mesh.FaceMesh(
-    max_num_faces=1,
-    refine_landmarks=True,
-    min_detection_confidence=0.5,
-    min_tracking_confidence=0.5
-)
+# Initialize OpenCV face detector using Haar Cascade
+# This is built into OpenCV and works well for face detection
+face_cascade_path = cv2.data.haarcascades + 'haarcascade_frontalface_default.xml'
+face_cascade = cv2.CascadeClassifier(face_cascade_path)
 
 # Store player state
 player_states = {}
 
-def analyze_facial_expression(landmarks, image_shape):
-    """Analyze facial landmarks to determine stress/emotion level"""
-    if not landmarks:
+def analyze_facial_expression(face_rect, image_shape, previous_rect=None):
+    """Analyze facial region to determine stress/emotion level using OpenCV"""
+    if face_rect is None:
         return 0.5  # Neutral
     
     try:
         # Get image dimensions
         h, w = image_shape[:2]
         
-        # Extract all landmark points (MediaPipe returns normalized coordinates)
-        points = []
-        for landmark in landmarks.landmark:
-            x = landmark.x * w
-            y = landmark.y * h
-            z = landmark.z * w  # Depth
-            points.append((x, y, z))
+        # Extract face coordinates (x, y, width, height)
+        x, y, face_width, face_height = face_rect
         
-        # Calculate facial metrics using general regions
-        # Find bounding box of face
-        x_coords = [p[0] for p in points]
-        y_coords = [p[1] for p in points]
-        face_width = max(x_coords) - min(x_coords)
-        face_height = max(y_coords) - min(y_coords)
-        face_center_x = (max(x_coords) + min(x_coords)) / 2
-        face_center_y = (max(y_coords) + min(y_coords)) / 2
+        # Calculate face center
+        face_center_x = x + face_width / 2
+        face_center_y = y + face_height / 2
         
-        # Estimate stress based on facial geometry
-        # More variance in landmark positions = more facial movement = potential stress
+        # Estimate stress based on facial geometry and movement
         stress_score = 0.5  # Start neutral
         
-        # Calculate variance in landmark positions (facial movement)
-        x_variance = np.var([p[0] for p in points])
-        y_variance = np.var([p[1] for p in points])
-        z_variance = np.var([p[2] for p in points])
-        
-        # Normalize variances (these are pixel-based, so scale appropriately)
-        normalized_x_var = min(x_variance / (w * w * 0.01), 1.0)
-        normalized_y_var = min(y_variance / (h * h * 0.01), 1.0)
-        normalized_z_var = min(z_variance / (w * w * 0.01), 1.0)
-        
-        # Higher variance = more movement = higher potential stress
-        movement_stress = (normalized_x_var + normalized_y_var + normalized_z_var) / 3.0
-        
         # Calculate face aspect ratio (stress can affect facial shape)
-        aspect_ratio = face_height / (face_width + 1)
+        aspect_ratio = face_height / (face_width + 1) if face_width > 0 else 1.0
         # Normal faces typically have aspect ratio around 1.2-1.5
         # Extreme values might indicate stress
         if aspect_ratio < 1.0 or aspect_ratio > 2.0:
@@ -77,8 +48,28 @@ def analyze_facial_expression(landmarks, image_shape):
         else:
             aspect_stress = 0.0
         
+        # Calculate movement stress if we have previous face position
+        movement_stress = 0.0
+        if previous_rect is not None:
+            prev_x, prev_y, prev_w, prev_h = previous_rect
+            # Calculate movement distance
+            center_movement = np.sqrt(
+                (face_center_x - (prev_x + prev_w/2))**2 + 
+                (face_center_y - (prev_y + prev_h/2))**2
+            )
+            # Normalize movement (more movement = more stress)
+            normalized_movement = min(center_movement / (w * 0.1), 1.0)
+            movement_stress = normalized_movement * 0.7
+        
+        # Calculate face size variation (stress can cause subtle size changes)
+        size_variance = 0.0
+        if previous_rect is not None:
+            prev_w, prev_h = previous_rect[2], previous_rect[3]
+            size_change = abs(face_width - prev_w) / (prev_w + 1) + abs(face_height - prev_h) / (prev_h + 1)
+            size_variance = min(size_change, 1.0) * 0.3
+        
         # Combine metrics
-        stress_score = movement_stress * 0.7 + aspect_stress * 0.3
+        stress_score = movement_stress + aspect_stress * 0.3 + size_variance
         
         # Add some randomness to make it more dynamic (simulate real stress detection)
         noise = random.uniform(-0.1, 0.1)
@@ -121,18 +112,19 @@ def analyze_face():
         
         # Convert RGB to BGR for OpenCV
         image_bgr = cv2.cvtColor(image_np, cv2.COLOR_RGB2BGR)
-        image_rgb = cv2.cvtColor(image_bgr, cv2.COLOR_BGR2RGB)
+        image_gray = cv2.cvtColor(image_bgr, cv2.COLOR_BGR2GRAY)
         
-        # Process with MediaPipe
-        results = face_mesh.process(image_rgb)
+        # Detect faces using OpenCV
+        faces = face_cascade.detectMultiScale(
+            image_gray,
+            scaleFactor=1.1,
+            minNeighbors=5,
+            minSize=(30, 30)
+        )
         
         stress_score = 0.5  # Default neutral
         face_detected = False
-        
-        if results.multi_face_landmarks:
-            face_detected = True
-            landmarks = results.multi_face_landmarks[0]
-            stress_score = analyze_facial_expression(landmarks, image_rgb.shape)
+        current_face_rect = None
         
         # Get or create player state
         player_id = data.get('player_id', 'default')
@@ -142,6 +134,25 @@ def analyze_face():
                 'difficulty': 1.0,
                 'face_detected': False
             }
+        
+        if len(faces) > 0:
+            face_detected = True
+            # Use the first detected face
+            current_face_rect = faces[0]
+            
+            # Get previous face position for movement tracking
+            previous_rect = None
+            if 'last_face_rect' in player_states[player_id]:
+                previous_rect = player_states[player_id]['last_face_rect']
+            
+            stress_score = analyze_facial_expression(
+                current_face_rect, 
+                image_bgr.shape,
+                previous_rect
+            )
+            
+            # Store current face position for next frame
+            player_states[player_id]['last_face_rect'] = current_face_rect
         
         # Update player state
         player_states[player_id]['stress_history'].append(stress_score)
