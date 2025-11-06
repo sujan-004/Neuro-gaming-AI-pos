@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Neuro-Adaptive Gaming AI</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🧠 Neuro-Adaptive Gaming AI</h1>
+            <p class="subtitle">Experience gaming that adapts to your stress levels in real-time</p>
+        </header>
+
+        <div class="main-content">
+            <!-- Camera and Analysis Section -->
+            <div class="left-panel">
+                <div class="camera-section">
+                    <div class="video-container">
+                        <video id="video" autoplay playsinline></video>
+                        <canvas id="canvas" style="display: none;"></canvas>
+                        <div class="camera-overlay">
+                            <div class="status-indicator" id="camera-status">
+                                <span class="status-dot"></span>
+                                <span>Camera Offline</span>
+                            </div>
+                        </div>
+                    </div>
+                    <button id="start-camera-btn" class="btn btn-primary">Enable Camera</button>
+                </div>
+
+                <div class="metrics-panel">
+                    <h3>Real-Time Analysis</h3>
+                    <div class="metric-grid">
+                        <div class="metric-card">
+                            <div class="metric-label">Facial Stress</div>
+                            <div class="metric-value" id="facial-stress">0.50</div>
+                            <div class="metric-bar">
+                                <div class="metric-fill" id="facial-stress-bar"></div>
+                            </div>
+                        </div>
+                        <div class="metric-card">
+                            <div class="metric-label">Keyboard Stress</div>
+                            <div class="metric-value" id="keyboard-stress">0.50</div>
+                            <div class="metric-bar">
+                                <div class="metric-fill" id="keyboard-stress-bar"></div>
+                            </div>
+                        </div>
+                        <div class="metric-card">
+                            <div class="metric-label">Combined Stress</div>
+                            <div class="metric-value" id="combined-stress">0.50</div>
+                            <div class="metric-bar">
+                                <div class="metric-fill" id="combined-stress-bar"></div>
+                            </div>
+                        </div>
+                        <div class="metric-card highlight">
+                            <div class="metric-label">Game Difficulty</div>
+                            <div class="metric-value" id="difficulty">1.00</div>
+                            <div class="difficulty-indicator">
+                                <span class="difficulty-label" id="difficulty-label">Normal</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="chart-container">
+                    <canvas id="stressChart"></canvas>
+                </div>
+            </div>
+
+            <!-- Game Section -->
+            <div class="right-panel">
+                <div class="game-container">
+                    <div class="game-header">
+                        <h2>Adaptive Challenge Game</h2>
+                        <div class="game-stats">
+                            <div class="stat">
+                                <span class="stat-label">Score:</span>
+                                <span class="stat-value" id="score">0</span>
+                            </div>
+                            <div class="stat">
+                                <span class="stat-label">Level:</span>
+                                <span class="stat-value" id="level">1</span>
+                            </div>
+                            <div class="stat">
+                                <span class="stat-label">Time:</span>
+                                <span class="stat-value" id="time">0s</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="game-area" id="game-area">
+                        <div class="game-start-screen" id="start-screen">
+                            <h3>Welcome!</h3>
+                            <p>Enable your camera to start the adaptive gaming experience</p>
+                            <p class="instructions">
+                                • Type the words that appear on screen<br>
+                                • Game difficulty adapts to your stress levels<br>
+                                • Stay calm for harder challenges!<br>
+                                • Get stressed for easier levels
+                            </p>
+                            <button id="start-game-btn" class="btn btn-large" disabled>Start Game</button>
+                        </div>
+
+                        <div class="game-active" id="game-active" style="display: none;">
+                            <div class="target-word" id="target-word">Ready...</div>
+                            <div class="input-container">
+                                <input type="text" id="game-input" autocomplete="off" spellcheck="false" placeholder="Type the word above...">
+                            </div>
+                            <div class="feedback" id="feedback"></div>
+                        </div>
+                    </div>
+
+                    <div class="game-controls">
+                        <button id="pause-btn" class="btn btn-secondary" style="display: none;">Pause</button>
+                        <button id="reset-btn" class="btn btn-secondary">Reset</button>
+                    </div>
+                </div>
+
+                <div class="info-panel">
+                    <h3>How It Works</h3>
+                    <div class="info-content">
+                        <div class="info-item">
+                            <strong>Facial Expression Analysis:</strong>
+                            <p>Your webcam analyzes facial muscle movements, eye openness, and mouth shape to detect stress levels.</p>
+                        </div>
+                        <div class="info-item">
+                            <strong>Keyboard Pattern Detection:</strong>
+                            <p>Typing rhythm, key press duration, and error patterns indicate your stress state.</p>
+                        </div>
+                        <div class="info-item">
+                            <strong>Adaptive Algorithm:</strong>
+                            <p>The game automatically adjusts difficulty to keep you in an optimal challenge zone.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="{{ url_for('static', filename='js/emotion.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/adaptive.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/game.js') }}"></script>
+</body>
+</html>
+
+
+
+
